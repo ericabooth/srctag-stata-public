@@ -39,6 +39,17 @@ program define srctag, rclass
         exit 459
     }
 
+    * ---- subcommand: srctag apply using file ------------------------------
+    * Applies edited lineage metadata from the layout srcfind's saving()
+    * writes (string variables varname, charname, value; a file column is
+    * ignored).  This closes the human-review loop: export the tags, let a
+    * reviewer correct them, fold the corrections back in.
+    if lower(`"`first'"') == "apply" {
+        srctag_apply `rest'
+        return add
+        exit
+    }
+
     * ---- subcommand: srctag show varlist  (alias: profile) ---------------
     if inlist(lower(`"`first'"'), "show", "profile") {
         local rest : list clean rest
@@ -150,29 +161,7 @@ program define srctag, rclass
     }
 
     * ---- dataset-level manifest of distinct source() values --------------
-    * Entries are separated by "; ".  Membership is checked entry by entry:
-    * the v1 substring check silently dropped a new source that happened to
-    * be a substring of one already recorded ("dealer" after "dealer file").
-    if `"`source'"' != "" {
-        local mani : char _dta[sources]
-        local found 0
-        local rest2 `"`mani'"'
-        while `"`rest2'"' != "" {
-            local p = strpos(`"`rest2'"', "; ")
-            if `p' {
-                local seg   = substr(`"`rest2'"', 1, `p' - 1)
-                local rest2 = substr(`"`rest2'"', `p' + 2, .)
-            }
-            else {
-                local seg `"`rest2'"'
-                local rest2 ""
-            }
-            if `"`seg'"' == `"`source'"' local found 1
-        }
-        if !`found' {
-            char _dta[sources] `"`mani'`=cond(`"`mani'"' == "", "", "; ")'`source'"'
-        }
-    }
+    if `"`source'"' != "" srctag_addmani `"`source'"'
 
     if `"`source'"' != "" {
         di as txt "srctag: stamped " as res `n' as txt " variable(s) with source " ///
@@ -232,4 +221,132 @@ program define srctag_show_one
         }
     }
     di as txt "{hline 72}"
+end
+
+* ---- srctag_addmani: add one source to the _dta[sources] manifest --------
+*      Entries are separated by "; ".  Membership is checked entry by entry:
+*      a substring check would silently drop a new source that happens to be
+*      a substring of one already recorded ("dealer" after "dealer file").
+program define srctag_addmani
+    version 16.0
+    gettoken src 0 : 0
+    local mani : char _dta[sources]
+    local found 0
+    local rest2 `"`mani'"'
+    while `"`rest2'"' != "" {
+        local p = strpos(`"`rest2'"', "; ")
+        if `p' {
+            local seg   = substr(`"`rest2'"', 1, `p' - 1)
+            local rest2 = substr(`"`rest2'"', `p' + 2, .)
+        }
+        else {
+            local seg `"`rest2'"'
+            local rest2 ""
+        }
+        if `"`seg'"' == `"`src'"' local found 1
+    }
+    if !`found' {
+        char _dta[sources] `"`mani'`=cond(`"`mani'"' == "", "", "; ")'`src'"'
+    }
+end
+
+* ---- srctag_apply: fold edited lineage metadata back into the data -------
+*      Reads the layout srcfind's saving() writes: one row per variable per
+*      characteristic, string variables varname, charname, value (a file
+*      column, if present, is ignored -- apply works on the data in memory).
+*      The overwrite guard holds here too: a row that would CHANGE an
+*      existing tag is held back unless -replace- is given, and the receipt
+*      says exactly what happened to every row.
+program define srctag_apply, rclass
+    version 16.0
+    syntax using/ [, replace]
+
+    tempname fr
+    frame create `fr'
+    capture frame `fr': use `"`using'"', clear
+    if _rc {
+        frame drop `fr'
+        di as err `"srctag apply: `using' could not be opened as a dataset"'
+        exit 601
+    }
+    foreach need in varname charname value {
+        capture frame `fr': confirm string variable `need', exact
+        if _rc {
+            frame drop `fr'
+            di as err "srctag apply: the file must hold string variables varname,"
+            di as err "              charname, and value -- the layout that"
+            di as err "              srcfind's saving() writes"
+            exit 198
+        }
+    }
+
+    local N = 0
+    frame `fr': local N = _N
+    local napplied  = 0
+    local nsame     = 0
+    local nheld     = 0
+    local nskipvar  = 0
+    local nskipname = 0
+    local nblank    = 0
+    local missvars ""
+    forvalues i = 1/`N' {
+        frame `fr' {
+            local v = varname[`i']
+            local c = charname[`i']
+            local x = value[`i']
+        }
+        * rows with no charname are the untagged placeholders saving() writes
+        if "`c'" == "" {
+            local ++nblank
+            continue
+        }
+        capture confirm name `c'
+        if _rc {
+            local ++nskipname
+            continue
+        }
+        capture confirm variable `v', exact
+        if _rc {
+            local ++nskipvar
+            if !`: list posof "`v'" in missvars' local missvars "`missvars' `v'"
+            continue
+        }
+        local cur : char `v'[`c']
+        if `"`macval(cur)'"' == `"`macval(x)'"' {
+            local ++nsame
+            continue
+        }
+        if `"`macval(cur)'"' != "" & "`replace'" == "" {
+            local ++nheld
+            continue
+        }
+        char `v'[`c'] `"`macval(x)'"'
+        if "`c'" == "source" & `"`macval(x)'"' != "" srctag_addmani `"`macval(x)'"'
+        local ++napplied
+    }
+    frame drop `fr'
+
+    * ---- the receipt ------------------------------------------------------
+    di as txt "srctag apply: " as res `napplied' as txt " tag(s) applied, " ///
+        as res `nsame' as txt " already current"
+    if `nheld' {
+        di as err "              `nheld' row(s) would CHANGE an existing tag and were"
+        di as err "              held back; add replace to apply them"
+    }
+    if `nskipvar' {
+        local missvars : list retokenize missvars
+        di as txt `"              skipped (variable not in memory):`missvars'"'
+    }
+    if `nskipname' ///
+        di as txt "              skipped `nskipname' row(s) with an invalid charname"
+    if `nblank' ///
+        di as txt "              ignored `nblank' untagged placeholder row(s)"
+    local sig : char _dta[src_signature]
+    if `"`sig'"' != "" & `napplied' > 0 ///
+        di as txt `"              the data are signed; rerun {stata "srctag sign":srctag sign} to restamp the signing time over the edited tags"'
+
+    return scalar n_applied = `napplied'
+    return scalar n_same    = `nsame'
+    return scalar n_held    = `nheld'
+    return scalar n_skipped = `nskipvar' + `nskipname'
 end

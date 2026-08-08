@@ -223,6 +223,64 @@ preserve
     assert _rc == 198
 restore
 
+* --- (19) apply: the human-review round trip ---------------------------------
+* export the tags, edit them the way a metadata reviewer would, fold the
+* edits back in with the guard and receipt intact
+tempfile lin lin2
+srcfind , all noreport saving("`lin'.dta", replace)
+preserve
+    use "`lin'.dta", clear
+    * reviewer corrects one vintage, clears one notes-style tag via a new
+    * row, retags a variable that no longer exists, and leaves the rest
+    quietly replace value = "2026-08" if varname == "mpg" & charname == "source_vintage"
+    quietly count
+    local addrow = r(N) + 1
+    quietly set obs `addrow'
+    quietly replace varname  = "ghostvar"    in `addrow'
+    quietly replace charname = "source"      in `addrow'
+    quietly replace value    = "phantom file" in `addrow'
+    quietly save "`lin2'.dta", replace
+restore
+* without replace: the changed vintage is held back, nothing else changes
+srctag apply using "`lin2'.dta"
+assert r(n_held) == 1
+assert r(n_applied) == 0
+assert r(n_skipped) == 1
+local vv : char mpg[source_vintage]
+assert `"`vv'"' == "2026-07"
+* with replace: the edit lands; unchanged rows report as already current
+srctag apply using "`lin2'.dta", replace
+assert r(n_applied) == 1
+assert r(n_held) == 0
+local vv : char mpg[source_vintage]
+assert `"`vv'"' == "2026-08"
+* rerun is a no-op (everything already current)
+srctag apply using "`lin2'.dta", replace
+assert r(n_applied) == 0
+assert r(n_same) >= 1
+* a new source value applied through apply reaches the manifest
+preserve
+    clear
+    quietly set obs 1
+    generate str32 varname  = "turn"
+    generate str32 charname = "source"
+    generate str244 value   = "auditor list 2026"
+    quietly save "`lin2'.dta", replace
+restore
+srctag apply using "`lin2'.dta", replace
+assert r(n_applied) == 1
+local m : char _dta[sources]
+assert strpos(`"`m'"', "auditor list 2026") > 0
+* a file without the expected layout errors clearly
+preserve
+    sysuse bplong, clear
+    quietly save "`lin2'.dta", replace
+restore
+capture noisily srctag apply using "`lin2'.dta"
+assert _rc == 198
+capture noisily srctag apply using "`c(tmpdir)'/no_such_file_xyz.dta"
+assert _rc == 601
+
 * --- (14) the book's printed example, verbatim -------------------------------
 preserve
     clear

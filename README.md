@@ -50,6 +50,11 @@ srcfind TWC, dir("warehouse")
 * fingerprint the data the tags describe; catch staleness later
 srctag sign
 srctag verify        // errors 459 if the data changed since signing
+
+* let a reviewer correct the tags themselves, then fold the edits back in
+srcfind , all saving("lineage.dta", replace) noreport
+* ... reviewer edits lineage.dta ...
+srctag apply using "lineage.dta", replace
 ```
 
 ## What each command does
@@ -97,8 +102,11 @@ do relabel.do        // labels AND srctags restored
 srctag verify        // then re-check the data signature
 ```
 
-For a machine-readable inventory of the tags (one row per variable per
-tag, editable and re-appliable), use `srcfind , all saving("lineage.dta")`.
+For corrections to the tags themselves, export with `srcfind , all
+saving("lineage.dta")`, let the reviewer edit that file, and fold the
+edits back with `srctag apply using "lineage.dta", replace` — guarded,
+with a row-by-row receipt. (The datadictionary workbook is for reading;
+route metadata corrections through this file instead.)
 
 ## Testing
 

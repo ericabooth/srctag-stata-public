@@ -36,6 +36,9 @@ Companion command {helpb srcfind} searches the stamps.{p_end}
 {cmd:srctag} {cmd:show} {varlist}
 
 {p 8 16 2}
+{cmd:srctag} {cmd:apply} {cmd:using} {it:filename} [{cmd:,} {cmd:replace}]
+
+{p 8 16 2}
 {cmd:srctag} {cmd:sign}
 
 {p 8 16 2}
@@ -124,6 +127,23 @@ lineage: storage type, labels, both schemas' tags, and any other
 characteristics the variable carries. Each tag value is a clickable
 {helpb srcfind} search, and {cmd:src_url} is a clickable {cmd:browse}
 link.{p_end}
+
+{phang}
+{cmd:srctag apply using} {it:filename} folds edited lineage metadata back
+into the data in memory. The file is the layout {helpb srcfind}'s
+{opt saving()} writes -- string variables {cmd:varname}, {cmd:charname},
+and {cmd:value}, one row per tag ({cmd:file}, if present, is ignored) --
+so the review loop is: export the tags, let a reviewer correct them in
+the Data Editor or a spreadsheet, apply the corrections. The overwrite
+guard holds: a row that would {it:change} an existing tag is held back
+unless {cmd:replace} is given, and a receipt reports every row's fate --
+applied, already current, held, or skipped (variable not in memory, or an
+invalid characteristic name). An applied {cmd:source} value joins the
+{cmd:_dta[sources]} manifest. Stored results:
+{cmd:r(n_applied)}, {cmd:r(n_same)}, {cmd:r(n_held)},
+{cmd:r(n_skipped)}. See the
+{help srctag##review:human review} section below for the full
+recipe.{p_end}
 
 {phang}
 {cmd:srctag sign} computes the dataset's {helpb datasignature} and stores
@@ -220,10 +240,32 @@ restores every tag exactly as stamped:{p_end}
         . srctag verify                        // then re-check the signature
 {txt}{...}
 
+{marker review}{...}
 {pstd}
-For a machine-readable inventory of the tags themselves (one row per
-variable per tag, editable and re-appliable), see {helpb srcfind}'s
-{opt saving()} option.{p_end}
+{bf:Human review of the metadata itself.} A reviewer who spots a wrong
+vintage or a misnamed agency needs a way to correct the {it:tags}, not
+the data. {helpb srcfind}'s {opt saving()} exports every tag as an
+editable dataset -- one row per variable per characteristic -- and
+{cmd:srctag apply} folds the corrected file back in, with the overwrite
+guard and a row-by-row receipt. (Edits typed into the
+{cmd:datadictionary} workbook cannot travel back this way: the workbook
+is for reading. Route metadata corrections through this file
+instead.){p_end}
+
+{cmd}{...}
+        . srcfind , all saving("lineage.dta", replace) noreport
+        . * ... a reviewer corrects values in lineage.dta ...
+        . srctag apply using "lineage.dta", replace
+        . srctag sign
+        . datadictionary, excel("codebook.xlsx") replace
+{txt}{...}
+
+{pstd}
+The last two lines matter: re-sign so the signing timestamp postdates the
+corrections, and rebuild the codebook so what people read matches what
+the file now says. If a relabel do-file exists (from
+{cmd:datadictionary, dofile()}), regenerate it too -- an old one would
+restore the uncorrected tags on the next data round trip.{p_end}
 
 
 {marker examples}{...}
