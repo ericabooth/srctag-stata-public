@@ -21,6 +21,9 @@ net install srctag, from("https://raw.githubusercontent.com/ericabooth/srctag-st
 
 Requires Stata 16.0 or newer. One install provides both commands.
 
+
+<img width="2400" height="1260" alt="projectbuilder_srctag_suite" src="https://github.com/user-attachments/assets/a144a8d5-b3c8-45a6-bb23-c18b4b138f51" />
+
 ## Quick start
 
 ```stata
