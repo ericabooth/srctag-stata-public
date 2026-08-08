@@ -170,6 +170,12 @@ contract at the top of a do-file:{p_end}
 {txt}{...}
 
 {pstd}
+Derived variables count too. A year extracted from filenames, an index
+you constructed, a flag you generated: each is a variable someone will
+ask about, so the contract passes only when they carry their own source
+(for example, {cmd:srctag year, source(derived by combineall from the filenames)}).{p_end}
+
+{pstd}
 {helpb srctag}'s {cmd:sign}/{cmd:verify} pair covers the other failure
 mode, tags that describe data that has since changed.{p_end}
 
