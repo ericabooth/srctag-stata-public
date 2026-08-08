@@ -120,7 +120,7 @@ row per matched variable per lineage characteristic, with columns
 variable selected by {opt untagged} or {cmd:not} gets one row with empty
 {cmd:charname}. This is the machine-readable inventory; for a
 human-readable codebook see {helpb srctag}'s
-{help srctag##codebooks:datadictionary recipe}.{p_end}
+{help srctag##ecosystem:datadictionary recipe}.{p_end}
 
 {phang}
 {opt profile} runs {cmd:srctag show} on each match (in-memory searches
@@ -177,7 +177,7 @@ ask about, so the contract passes only when they carry their own source
 
 {pstd}
 {helpb srctag}'s {cmd:sign}/{cmd:verify} pair covers the other failure
-mode, tags that describe data that has since changed.{p_end}
+mode, tags that describe data that have since changed.{p_end}
 
 
 {marker ecosystem}{...}
@@ -186,26 +186,26 @@ mode, tags that describe data that has since changed.{p_end}
 {pstd}
 {cmd:srcfind} needs nothing beyond Stata 16: the warehouse scan uses
 Stata's own {help frames}, and no other package is required. What it
-searches, though, is written by three different tools, and its results
-feed two more. None of these is a dependency; each is a
-connection.{p_end}
+searches is written by two tools, and its results feed both machines
+and people.{p_end}
 
 {pstd}
-{bf:Tags come from srctag} (ships in this package) -- the deliberate
-stamps -- and {bf:from combineall} (SSC:
+{bf:Tags come from srctag} (ships in this package), the deliberate
+stamps, and {bf:from combineall} (SSC:
 {cmd:ssc install combineall}), whose harmonization layer writes
 {cmd:char[source]} as {cmd:"oldname (file, year)"} automatically while
-stacking yearly releases. A combineall-built panel is searchable the
-moment it is saved, no srctag call needed:{p_end}
+stacking yearly releases. The mapped variables of a combineall-built
+panel are searchable the moment it is saved, no srctag call
+needed:{p_end}
 
 {cmd}{...}
         . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
-        . srcfind 2019                        // which variables came from the 2019 file?
+        . srcfind 2019               // which mapped variables trace to a 2019 file?
 {txt}{...}
 
 {pstd}
 {bf:Results feed the next command} through {cmd:r(varlist)} and
-{opt local()} -- see the examples below -- and {bf:feed people} through
+{opt local()} (see the examples below) and {bf:feed people} through
 {helpb datadictionary} (SSC: {cmd:ssc install datadictionary}), whose
 codebook workbook shows each variable's {cmd:char[source]} in a
 dedicated column. {cmd:srcfind}'s own {opt saving()} is the
@@ -225,9 +225,9 @@ project:{p_end}
 {txt}{...}
 
 {pstd}
-The full tagging story -- including {cmd:datadictionary}'s
-{cmd:dofile()} round trip, which restores every tag after data travel
-through R, Python, or Excel -- is in
+The full tagging story, including {cmd:datadictionary}'s
+{cmd:dofile()} round trip that restores every tag after data travel
+through R, Python, or Excel, is in
 {help srctag##ecosystem:srctag's ecosystem section}.{p_end}
 
 

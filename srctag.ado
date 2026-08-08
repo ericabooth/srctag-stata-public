@@ -318,6 +318,7 @@ program define srctag_apply, rclass
         }
         if `"`macval(cur)'"' != "" & "`replace'" == "" {
             local ++nheld
+            local held`nheld' "`v'[`c']"
             continue
         }
         char `v'[`c'] `"`macval(x)'"'
@@ -331,7 +332,10 @@ program define srctag_apply, rclass
         as res `nsame' as txt " already current"
     if `nheld' {
         di as err "              `nheld' row(s) would CHANGE an existing tag and were"
-        di as err "              held back; add replace to apply them"
+        di as err "              held back; add replace to apply them:"
+        forvalues j = 1/`nheld' {
+            di as err "                `held`j''"
+        }
     }
     if `nskipvar' {
         local missvars : list retokenize missvars

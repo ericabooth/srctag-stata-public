@@ -164,21 +164,18 @@ first.{p_end}
 {title:The ecosystem: how these packages work together}
 
 {pstd}
-{cmd:srctag} needs nothing beyond Stata 16 -- no other package is
+{cmd:srctag} needs nothing beyond Stata 16: no other package is
 required, and {cmd:sign}/{cmd:verify} use Stata's own
-{helpb datasignature}. Three companion packages make the tags do more
-work, and each is optional.{p_end}
-
-{pstd}
-{bf:srcfind (ships in this package).} The reader for everything
-{cmd:srctag} writes. One install provides both commands; there is
-nothing separate to fetch. See {helpb srcfind} for the search,
-audit, and export side of the workflow.{p_end}
+{helpb datasignature}. {bf:srcfind} ships in this package and is the
+reader for everything {cmd:srctag} writes; one install provides both
+commands (see {helpb srcfind} for the search, audit, and export side of
+the workflow). Three companion packages, each optional, make the tags do
+more work.{p_end}
 
 {pstd}
 {bf:projectbuilder} (SSC: {cmd:ssc install projectbuilder}) scaffolds a
-project whose generated {cmd:300_labels.do} -- the labeling stage of its
-numbered pipeline -- is where the tagging belongs: the raw files are
+project whose generated {cmd:300_labels.do} (the labeling stage of its
+numbered pipeline) is where the tagging belongs: the raw files are
 identified, the analytic file exists, and the do-file already carries a
 commented {cmd:srctag} block inviting the stamps. Tag there and every
 later stage inherits the lineage. {cmd:projectbuilder check} reports
@@ -195,12 +192,13 @@ a clickable install command:{p_end}
 
 {pstd}
 {bf:combineall} (SSC: {cmd:ssc install combineall}) writes
-{cmd:char[source]} itself: its harmonization layer stamps each mapped
-variable with {cmd:"oldname (file, year)"} while stacking yearly file
-releases. A combineall-built panel is therefore {helpb srcfind}-searchable
-with no srctag call at all, and {cmd:srctag} can then add what the
-stamp lacks (an agency, a URL) without disturbing it -- add
-{cmd:replace} only if you mean to overwrite combineall's stamp:{p_end}
+{cmd:char[source]} itself: its harmonization layer stamps each variable
+renamed through {cmd:map()} with {cmd:"oldname (file, year)"} while
+stacking yearly file releases. Those mapped variables are
+{helpb srcfind}-searchable with no srctag call at all, and {cmd:srctag}
+can then add what the stamp lacks (an agency, a URL) without disturbing
+it; add {cmd:replace} only if you mean to overwrite combineall's
+stamp:{p_end}
 
 {cmd}{...}
         . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
@@ -211,9 +209,9 @@ stamp lacks (an agency, a URL) without disturbing it -- add
 {pstd}
 {bf:datadictionary} (SSC: {cmd:ssc install datadictionary}) is where the
 tags leave Stata. Its codebook workbook harvests {cmd:char[source]} into
-a dedicated {cmd:srctag} column -- labeled "char [source] (written by
-srctag/combineall)" -- with every other characteristic (the structured
-{cmd:src_*} fields included) collected beside it, so the finished
+a dedicated {cmd:srctag} column (labeled "char [source] (written by
+srctag/combineall)") with every other characteristic, the structured
+{cmd:src_*} fields included, collected beside it, so the finished
 codebook answers the provenance question for someone who does not have
 Stata:{p_end}
 
@@ -226,8 +224,8 @@ Stata:{p_end}
 {pstd}
 {cmd:datadictionary}'s {cmd:dofile()} option closes the loop in the
 other direction. It writes a relabel do-file that snapshots the current
-metadata -- labels, formats, notes, and {it:all characteristics,
-lineage tags included} -- so when the data go out as a bare CSV to a
+metadata (labels, formats, notes, and {it:all variable characteristics,
+lineage tags included}), so when the data go out as a bare CSV to a
 collaborator in R, Python, or Excel and come back edited, one {cmd:do}
 restores every tag exactly as stamped:{p_end}
 
@@ -237,17 +235,23 @@ restores every tag exactly as stamped:{p_end}
         . * ... collaborator edits share.csv and returns it ...
         . import delimited using "share.csv", varnames(1) case(preserve) clear
         . do relabel.do                        // labels AND srctags restored
-        . srctag verify                        // then re-check the signature
+        . srctag sign                          // re-fingerprint the returned data
 {txt}{...}
+
+{pstd}
+The last line is {cmd:sign}, not {cmd:verify}: the signature lives in
+dataset-level characteristics, which a CSV cannot carry, so the returned
+file has no signature to check. Look the restored data over, then sign
+it fresh.{p_end}
 
 {marker review}{...}
 {pstd}
 {bf:Human review of the metadata itself.} A reviewer who spots a wrong
 vintage or a misnamed agency needs a way to correct the {it:tags}, not
 the data. {helpb srcfind}'s {opt saving()} exports every tag as an
-editable dataset -- one row per variable per characteristic -- and
+editable dataset, one row per variable per characteristic, and
 {cmd:srctag apply} folds the corrected file back in, with the overwrite
-guard and a row-by-row receipt. (Edits typed into the
+guard and a receipt that accounts for every row. (Edits typed into the
 {cmd:datadictionary} workbook cannot travel back this way: the workbook
 is for reading. Route metadata corrections through this file
 instead.){p_end}
