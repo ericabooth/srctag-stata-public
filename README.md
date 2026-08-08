@@ -70,16 +70,32 @@ varlist to your next command, and `saving()` to export every tag as a
 machine-readable dataset. `srcfind tags` and `srcfind values` browse the
 tagging vocabulary a file already uses.
 
-## Codebooks
+## The ecosystem: four packages, one provenance story
 
-[`datadictionary`](https://ideas.repec.org/c/boc/bocode/s459844.html)
-(SSC) harvests `char[source]` into a dedicated codebook column:
+None of these is required — srctag/srcfind need only Stata 16 — but each
+connection makes the tags do more work.
+
+| Package | Connection | Install |
+|---|---|---|
+| **projectbuilder** | Its generated `300_labels.do` (the labeling stage of the numbered pipeline) is where tagging belongs: raw files identified, analytic file built, a commented `srctag` block already waiting. `projectbuilder check` reports whether srctag/srcfind are installed, beside every other companion. | `ssc install projectbuilder` |
+| **combineall** | Writes `char[source]` **itself**: its harmonization layer stamps each mapped variable with `"oldname (file, year)"` while stacking yearly releases — so a combineall-built panel is srcfind-searchable with no srctag call at all. srctag then adds what the stamp lacks (an agency, a URL) without disturbing it. | `ssc install combineall` |
+| **datadictionary** | Harvests `char[source]` into a dedicated **srctag column** of its codebook workbook (with every other characteristic beside it), so the finished codebook answers the provenance question for someone without Stata. Its `dofile()` option snapshots *all* metadata — lineage tags included — into a relabel do-file. | `ssc install datadictionary` |
+| **srcfind** | Ships in this package: the reader for everything srctag writes. | (included) |
+
+The round trip that makes the tags durable: send data out as a bare CSV,
+get it back edited, restore every tag in one `do`:
 
 ```stata
-srctag q_wage q_hours, source(TWC wage file) vintage(2026q2)
-srctag sign
-datadictionary, excel("codebook.xlsx") replace
+datadictionary, dofile("relabel.do")
+export delimited using "share.csv", nolabel replace
+* ... collaborator edits share.csv in R / Python / Excel ...
+import delimited using "share.csv", varnames(1) case(preserve) clear
+do relabel.do        // labels AND srctags restored
+srctag verify        // then re-check the data signature
 ```
+
+For a machine-readable inventory of the tags (one row per variable per
+tag, editable and re-appliable), use `srcfind , all saving("lineage.dta")`.
 
 ## Testing
 
