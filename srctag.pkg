@@ -1,0 +1,36 @@
+v 3
+d srctag: modules to stamp variables with source lineage and search it
+d
+d srctag writes a variable's origin -- source, vintage, notes, and the
+d structured fields agency, dataset, url, and category -- into its
+d characteristics, the metadata slot that survives save and travels
+d with the dataset through every later merge and append. It refuses to
+d change an existing tag unless told replace, keeps a dataset-level
+d manifest of every source in _dta[sources], and can sign the data
+d with -datasignature- so stale provenance is caught instead of
+d trusted. Companion command srcfind searches the tags: in memory or
+d across a whole folder of .dta files (read header-only in a frame,
+d so nothing in memory is disturbed), with contains, exact, wildcard,
+d and case-sensitive matching, an untagged audit, inverted matches,
+d results in r(varlist) and a macro of your choosing, and a
+d machine-readable export of every tag as a dataset. srcfind tags and
+d srcfind values browse the tagging vocabulary a file already uses.
+d Pairs with datadictionary (SSC), which harvests the source tag into
+d its codebook workbook.
+d
+d Requires: Stata 16.0 or newer.
+d
+d A test battery ships with the package as an ancillary file; retrieve
+d it with -net get srctag- and run it with -do test_srctag.do-.
+d
+d Authors: Eric A. Booth
+d          Elizabeth Teas
+d Support: eric.a.booth@gmail.com
+d
+d Distribution-Date: 20260808
+d
+f srctag.ado
+f srctag.sthlp
+f srcfind.ado
+f srcfind.sthlp
+f test_srctag.do

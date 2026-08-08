@@ -1,0 +1,3 @@
+v 3
+d srctag: stamp variables with source lineage and search it (srctag + srcfind)
+p srctag
