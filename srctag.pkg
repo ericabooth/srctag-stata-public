@@ -15,6 +15,8 @@ d and case-sensitive matching, an untagged audit, inverted matches,
 d results in r(varlist) and a macro of your choosing, and a
 d machine-readable export of every tag as a dataset. srcfind tags and
 d srcfind values browse the tagging vocabulary a file already uses.
+d srctag apply folds a reviewer's edits to that exported file back
+d into the data, guarded and receipted, closing the human-review loop.
 d Pairs with datadictionary (SSC), which harvests the source tag into
 d its codebook workbook.
 d
