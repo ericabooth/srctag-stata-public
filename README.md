@@ -1,6 +1,6 @@
 # srctag + srcfind
 
-Stamp Stata variables with their source lineage, and search the stamps —
+Stamp Stata variables with characteristics (meta-information) including: their source lineage, their category (e.g., survey construct, origin, topic), and search these tags/stamps —
 in memory or across a whole folder of `.dta` files. The simplest question
 in applied work is often the hardest to answer on the spot: *where did
 this number come from?* `srctag` writes the answer into each variable's
