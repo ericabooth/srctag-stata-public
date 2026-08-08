@@ -8,6 +8,7 @@
 {viewerjumpto "Options"        "srcfind##options"}{...}
 {viewerjumpto "Warehouse scan" "srcfind##warehouse"}{...}
 {viewerjumpto "Audits"         "srcfind##audits"}{...}
+{viewerjumpto "The ecosystem"  "srcfind##ecosystem"}{...}
 {viewerjumpto "Subcommands"    "srcfind##subcommands"}{...}
 {viewerjumpto "Examples"       "srcfind##examples"}{...}
 {viewerjumpto "Stored results" "srcfind##results"}{...}
@@ -173,6 +174,57 @@ contract at the top of a do-file:{p_end}
 mode, tags that describe data that has since changed.{p_end}
 
 
+{marker ecosystem}{...}
+{title:The ecosystem: where the tags come from and where they go}
+
+{pstd}
+{cmd:srcfind} needs nothing beyond Stata 16: the warehouse scan uses
+Stata's own {help frames}, and no other package is required. What it
+searches, though, is written by three different tools, and its results
+feed two more. None of these is a dependency; each is a
+connection.{p_end}
+
+{pstd}
+{bf:Tags come from srctag} (ships in this package) -- the deliberate
+stamps -- and {bf:from combineall} (SSC:
+{cmd:ssc install combineall}), whose harmonization layer writes
+{cmd:char[source]} as {cmd:"oldname (file, year)"} automatically while
+stacking yearly releases. A combineall-built panel is searchable the
+moment it is saved, no srctag call needed:{p_end}
+
+{cmd}{...}
+        . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
+        . srcfind 2019                        // which variables came from the 2019 file?
+{txt}{...}
+
+{pstd}
+{bf:Results feed the next command} through {cmd:r(varlist)} and
+{opt local()} -- see the examples below -- and {bf:feed people} through
+{helpb datadictionary} (SSC: {cmd:ssc install datadictionary}), whose
+codebook workbook shows each variable's {cmd:char[source]} in a
+dedicated column. {cmd:srcfind}'s own {opt saving()} is the
+machine-readable counterpart: one row per variable per tag, a file you
+can filter, merge, or hand to a metadata reviewer.{p_end}
+
+{pstd}
+{bf:projectbuilder} (SSC: {cmd:ssc install projectbuilder}) supplies the
+folder discipline the warehouse scan assumes: its projects keep analytic
+files in a predictable {cmd:02_cleaned/} folder, so auditing a whole
+portfolio is one loop over project folders, or one {opt dir()} call per
+project:{p_end}
+
+{cmd}{...}
+        . srcfind , untagged dir("CountyBudgets/02_cleaned") noreport
+        . di r(n) " untagged variable(s) in the analytic folder"
+{txt}{...}
+
+{pstd}
+The full tagging story -- including {cmd:datadictionary}'s
+{cmd:dofile()} round trip, which restores every tag after data travel
+through R, Python, or Excel -- is in
+{help srctag##ecosystem:srctag's ecosystem section}.{p_end}
+
+
 {marker subcommands}{...}
 {title:Subcommands}
 
@@ -238,9 +290,17 @@ source:{p_end}
         . srcfind , all saving("lineage.dta", replace) noreport
 {txt}{...}
 
-{pstd}Scan a warehouse folder without touching the data in memory:{p_end}
+{pstd}Chain a search into a full profile of each match:{p_end}
+{cmd}{...}
+        . srcfind TWC, char(src_agency) profile
+{txt}{...}
+
+{pstd}Scan a folder of .dta files without touching the data in memory,
+then act on what came back:{p_end}
 {cmd}{...}
         . srcfind TWC, dir("warehouse")
+        . di r(n) " matching variable(s) across " r(nfiles) " file(s)"
+        . di `"files with matches: `r(files)'"'
 {txt}{...}
 
 

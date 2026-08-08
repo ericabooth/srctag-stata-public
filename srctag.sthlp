@@ -8,7 +8,7 @@
 {viewerjumpto "Description"    "srctag##description"}{...}
 {viewerjumpto "Options"        "srctag##options"}{...}
 {viewerjumpto "Subcommands"    "srctag##subcommands"}{...}
-{viewerjumpto "Codebooks"      "srctag##codebooks"}{...}
+{viewerjumpto "The ecosystem"  "srctag##ecosystem"}{...}
 {viewerjumpto "Examples"       "srctag##examples"}{...}
 {viewerjumpto "Stored results" "srctag##results"}{...}
 {viewerjumpto "Authors"        "srctag##authors"}{...}
@@ -140,16 +140,62 @@ signature it stops with error 198 and says to run {cmd:srctag sign}
 first.{p_end}
 
 
-{marker codebooks}{...}
-{title:Codebooks: srctag with datadictionary}
+{marker ecosystem}{...}
+{title:The ecosystem: how these packages work together}
 
 {pstd}
-The tags are most useful when they leave Stata. {helpb datadictionary}
-(SSC: {cmd:ssc install datadictionary}) builds a codebook workbook from
-the data in memory, and it harvests {cmd:char[source]} into a dedicated
-{cmd:srctag} column, with every other characteristic (the structured
-{cmd:src_*} fields included) collected beside it. The three-command
-recipe:{p_end}
+{cmd:srctag} needs nothing beyond Stata 16 -- no other package is
+required, and {cmd:sign}/{cmd:verify} use Stata's own
+{helpb datasignature}. Three companion packages make the tags do more
+work, and each is optional.{p_end}
+
+{pstd}
+{bf:srcfind (ships in this package).} The reader for everything
+{cmd:srctag} writes. One install provides both commands; there is
+nothing separate to fetch. See {helpb srcfind} for the search,
+audit, and export side of the workflow.{p_end}
+
+{pstd}
+{bf:projectbuilder} (SSC: {cmd:ssc install projectbuilder}) scaffolds a
+project whose generated {cmd:300_labels.do} -- the labeling stage of its
+numbered pipeline -- is where the tagging belongs: the raw files are
+identified, the analytic file exists, and the do-file already carries a
+commented {cmd:srctag} block inviting the stamps. Tag there and every
+later stage inherits the lineage. {cmd:projectbuilder check} reports
+whether srctag/srcfind are installed, beside every other companion, with
+a clickable install command:{p_end}
+
+{cmd}{...}
+        . projectbuilder CountyBudgets, data("budget_drop")
+        . do "CountyBudgets/_code/000_control.do"
+        . use "$cleaned/CountyBudgets_analytic.dta", clear
+        . srctag _all, source(county budget drop) vintage(FY2026)
+        . save, replace
+{txt}{...}
+
+{pstd}
+{bf:combineall} (SSC: {cmd:ssc install combineall}) writes
+{cmd:char[source]} itself: its harmonization layer stamps each mapped
+variable with {cmd:"oldname (file, year)"} while stacking yearly file
+releases. A combineall-built panel is therefore {helpb srcfind}-searchable
+with no srctag call at all, and {cmd:srctag} can then add what the
+stamp lacks (an agency, a URL) without disturbing it -- add
+{cmd:replace} only if you mean to overwrite combineall's stamp:{p_end}
+
+{cmd}{...}
+        . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
+        . srcfind , all                        // combineall's stamps, ready to search
+        . srctag wage, agency(TWC) url(https://twc.texas.gov)
+{txt}{...}
+
+{pstd}
+{bf:datadictionary} (SSC: {cmd:ssc install datadictionary}) is where the
+tags leave Stata. Its codebook workbook harvests {cmd:char[source]} into
+a dedicated {cmd:srctag} column -- labeled "char [source] (written by
+srctag/combineall)" -- with every other characteristic (the structured
+{cmd:src_*} fields included) collected beside it, so the finished
+codebook answers the provenance question for someone who does not have
+Stata:{p_end}
 
 {cmd}{...}
         . srctag q_wage q_hours, source(TWC wage file) vintage(2026q2)
@@ -158,10 +204,26 @@ recipe:{p_end}
 {txt}{...}
 
 {pstd}
-gives a codebook in which every variable's row already answers the
-provenance question, readable by someone who does not have Stata. For a
-machine-readable inventory instead, see {helpb srcfind}'s {opt saving()}
-option, which exports the tags as a dataset.{p_end}
+{cmd:datadictionary}'s {cmd:dofile()} option closes the loop in the
+other direction. It writes a relabel do-file that snapshots the current
+metadata -- labels, formats, notes, and {it:all characteristics,
+lineage tags included} -- so when the data go out as a bare CSV to a
+collaborator in R, Python, or Excel and come back edited, one {cmd:do}
+restores every tag exactly as stamped:{p_end}
+
+{cmd}{...}
+        . datadictionary, dofile("relabel.do")
+        . export delimited using "share.csv", nolabel replace
+        . * ... collaborator edits share.csv and returns it ...
+        . import delimited using "share.csv", varnames(1) case(preserve) clear
+        . do relabel.do                        // labels AND srctags restored
+        . srctag verify                        // then re-check the signature
+{txt}{...}
+
+{pstd}
+For a machine-readable inventory of the tags themselves (one row per
+variable per tag, editable and re-appliable), see {helpb srcfind}'s
+{opt saving()} option.{p_end}
 
 
 {marker examples}{...}
@@ -185,6 +247,13 @@ not:{p_end}
         . srctag price, source(EPA extract)          // no-op, no error
 {txt}{...}
 
+{pstd}Record a caveat with the tag, where the next analyst will find
+it:{p_end}
+{cmd}{...}
+        . srctag weight, source(dealer file 2026)                    ///
+              notes(self-reported; overstated for pre-1975 models)
+{txt}{...}
+
 {pstd}Structured fields for a client-facing project, plus a custom
 field:{p_end}
 {cmd}{...}
@@ -192,6 +261,13 @@ field:{p_end}
               url(https://example.gov/twc) vintage(2025q3) category(labor)
         . srctag headroom, key(src_confidence) value(high)
         . srctag show headroom
+{txt}{...}
+
+{pstd}Each structured field is separately searchable, so the agency and
+the dataset answer different questions later:{p_end}
+{cmd}{...}
+        . srcfind TWC, char(src_agency)       // everything from this agency
+        . srcfind ledger, char(src_dataset)   // everything from this table
 {txt}{...}
 
 {pstd}The dataset-level manifest lists every source in the file:{p_end}
