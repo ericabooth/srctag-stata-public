@@ -99,8 +99,12 @@ export delimited using "share.csv", nolabel replace
 * ... collaborator edits share.csv in R / Python / Excel ...
 import delimited using "share.csv", varnames(1) case(preserve) clear
 do relabel.do        // labels AND srctags restored
-srctag verify        // then re-check the data signature
+srctag sign          // re-fingerprint the returned data
 ```
+
+The last step is `sign`, not `verify`: the signature lives in dataset-level
+characteristics, which a CSV cannot carry, so the returned file has no
+signature to check.
 
 For corrections to the tags themselves, export with `srcfind , all
 saving("lineage.dta")`, let the reviewer edit that file, and fold the
@@ -116,9 +120,20 @@ A test battery ships as an ancillary file (`net get srctag`):
 stata-mp -b do test_srctag.do
 ```
 
-18 blocks cover the tagging contract, guard semantics, the manifest,
+20 numbered blocks cover the tagging contract, guard semantics, the manifest,
 save/use persistence, every search mode, the warehouse scan, audits,
-exports, and sign/verify.
+exports, sign/verify, and `$` inside tag text.
+
+## Changes
+
+- **2.0.1 (2026-11-09):** a `$` inside tag text (OData/Socrata
+  `?$where=` URLs, `$USD`) is kept everywhere. In 2.0.0, `srctag show`,
+  `srcfind` report lines and `saving()` rows, and the `_dta[sources]` manifest
+  macro-expanded it away, so a `saving()`/`srctag apply, replace` round trip
+  overwrote good tags with mangled ones. The README round-trip recipe now ends
+  with `srctag sign`, matching the help.
+- **2.0.0 (2026-08-08):** structured-field schema, `show`, warehouse scan, and
+  `apply`.
 
 ## Authors
 

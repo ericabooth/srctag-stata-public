@@ -1,5 +1,8 @@
-*! version 2.0.0  Eric A. Booth and Elizabeth Teas  08aug2026
+*! version 2.0.1  Eric A. Booth and Elizabeth Teas  09nov2026
 *! srctag: stamp variables with their source lineage in characteristics
+*! v2.0.1 keeps a $ inside tag text (OData/Socrata ?$where= URLs, "$USD"):
+*!        stamping, show, and the sources manifest expand tag text through
+*!        macval(), so nothing is macro-expanded away.
 *! v2.0.0 merges the structured-field schema (src_agency, src_dataset,
 *!        src_url, src_vintage, src_category, key/value) and the show
 *!        subcommand into the v1 source/vintage/notes front door.
@@ -81,11 +84,11 @@ program define srctag, rclass
         replace              ///
         ]
 
-    if ("`key'" == "" & `"`value'"' != "") | ("`key'" != "" & `"`value'"' == "") {
+    if ("`key'" == "" & `"`macval(value)'"' != "") | ("`key'" != "" & `"`macval(value)'"' == "") {
         di as err "srctag: key() and value() must be supplied together"
         exit 198
     }
-    if `"`source'`vintage'`notes'`agency'`dataset'`url'`category'`key'"' == "" {
+    if `"`macval(source)'`macval(vintage)'`macval(notes)'`macval(agency)'`macval(dataset)'`macval(url)'`macval(category)'`key'"' == "" {
         di as err "srctag: supply at least one of source() vintage() notes() " ///
             "agency() dataset() url() category() or key()/value()"
         exit 198
@@ -95,45 +98,45 @@ program define srctag, rclass
     * vintage(), and notes() are the v1 names the book prints; the src_*
     * fields are the structured schema.  Both live side by side.
     local npairs 0
-    if `"`source'"' != "" {
+    if `"`macval(source)'"' != "" {
         local ++npairs
         local pc`npairs' "source"
-        local pv`npairs' `"`source'"'
+        local pv`npairs' `"`macval(source)'"'
     }
-    if `"`vintage'"' != "" {
+    if `"`macval(vintage)'"' != "" {
         local ++npairs
         local pc`npairs' "source_vintage"
-        local pv`npairs' `"`vintage'"'
+        local pv`npairs' `"`macval(vintage)'"'
     }
-    if `"`notes'"' != "" {
+    if `"`macval(notes)'"' != "" {
         local ++npairs
         local pc`npairs' "source_notes"
-        local pv`npairs' `"`notes'"'
+        local pv`npairs' `"`macval(notes)'"'
     }
-    if `"`agency'"' != "" {
+    if `"`macval(agency)'"' != "" {
         local ++npairs
         local pc`npairs' "src_agency"
-        local pv`npairs' `"`agency'"'
+        local pv`npairs' `"`macval(agency)'"'
     }
-    if `"`dataset'"' != "" {
+    if `"`macval(dataset)'"' != "" {
         local ++npairs
         local pc`npairs' "src_dataset"
-        local pv`npairs' `"`dataset'"'
+        local pv`npairs' `"`macval(dataset)'"'
     }
-    if `"`url'"' != "" {
+    if `"`macval(url)'"' != "" {
         local ++npairs
         local pc`npairs' "src_url"
-        local pv`npairs' `"`url'"'
+        local pv`npairs' `"`macval(url)'"'
     }
-    if `"`category'"' != "" {
+    if `"`macval(category)'"' != "" {
         local ++npairs
         local pc`npairs' "src_category"
-        local pv`npairs' `"`category'"'
+        local pv`npairs' `"`macval(category)'"'
     }
     if "`key'" != "" {
         local ++npairs
         local pc`npairs' "`key'"
-        local pv`npairs' `"`value'"'
+        local pv`npairs' `"`macval(value)'"'
     }
 
     * ---- the overwrite guard, uniformly on every characteristic ----------
@@ -144,8 +147,8 @@ program define srctag, rclass
     foreach v of varlist `varlist' {
         forvalues j = 1/`npairs' {
             local cur : char `v'[`pc`j'']
-            if `"`cur'"' != "" & `"`cur'"' != `"`pv`j''"' & "`replace'" == "" {
-                di as err `"srctag: `v' already carries `pc`j'' (`cur'); add replace to overwrite"'
+            if `"`macval(cur)'"' != "" & `"`macval(cur)'"' != `"`macval(pv`j')'"' & "`replace'" == "" {
+                di as err `"srctag: `v' already carries `pc`j'' (`macval(cur)'); add replace to overwrite"'
                 exit 110
             }
         }
@@ -155,17 +158,21 @@ program define srctag, rclass
     local n = 0
     foreach v of varlist `varlist' {
         forvalues j = 1/`npairs' {
-            char `v'[`pc`j''] `"`pv`j''"'
+            char `v'[`pc`j''] `"`macval(pv`j')'"'
         }
         local ++n
     }
 
     * ---- dataset-level manifest of distinct source() values --------------
-    if `"`source'"' != "" srctag_addmani `"`source'"'
+    * block-form if: a one-line if re-expands its command, which would drop
+    * a $ in the source text
+    if `"`macval(source)'"' != "" {
+        srctag_addmani `"`macval(source)'"'
+    }
 
-    if `"`source'"' != "" {
+    if `"`macval(source)'"' != "" {
         di as txt "srctag: stamped " as res `n' as txt " variable(s) with source " ///
-            as res `"`source'"'
+            as res `"`macval(source)'"'
     }
     else {
         di as txt "srctag: stamped " as res `n' as txt " variable(s)"
@@ -185,7 +192,7 @@ program define srctag_show_one
 
     di as txt "{hline 72}"
     di as txt "{bf:srctag:} " as res `"{stata "describe `v'":`v'}"' ///
-        as txt "  " `"`lab'"'
+        as txt "  " `"`macval(lab)'"'
     di as txt "{hline 72}"
     di as txt "  storage type" _col(20) ": " as res "`type'" _col(44) as txt "format: " as res "`fmt'"
     if "`vallab'" != "" di as txt "  value label" _col(20) ": " as res "`vallab'"
@@ -193,19 +200,22 @@ program define srctag_show_one
     * v1 names first (what the book prints), then the structured fields.
     foreach c in source source_vintage source_notes {
         local cv : char `v'[`c']
-        if `"`cv'"' != "" {
-            di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `cv'"':`cv'}"'
+        if `"`macval(cv)'"' != "" {
+            * the clickable command escapes $ so the search runs on the tag
+            local lk = subinstr(`"`macval(cv)'"', char(36), char(92) + char(36), .)
+            di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `macval(lk)'"':`macval(cv)'}"'
         }
     }
     foreach c in src_agency src_dataset src_vintage src_category {
         local cv : char `v'[`c']
-        if `"`cv'"' != "" {
-            di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `cv', char(`c')"':`cv'}"'
+        if `"`macval(cv)'"' != "" {
+            local lk = subinstr(`"`macval(cv)'"', char(36), char(92) + char(36), .)
+            di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `macval(lk)', char(`c')"':`macval(cv)'}"'
         }
     }
     local u : char `v'[src_url]
-    if `"`u'"' != "" {
-        di as txt "  src_url" _col(20) ": " as res `"{browse "`u'":`u'}"'
+    if `"`macval(u)'"' != "" {
+        di as txt "  src_url" _col(20) ": " as res `"{browse "`macval(u)'":`macval(u)'}"'
     }
 
     * anything else the variable carries, shown so nothing hides
@@ -217,7 +227,7 @@ program define srctag_show_one
         di as txt "  other characteristics:"
         foreach c of local extras {
             local cv : char `v'[`c']
-            di as txt "    `c'" _col(20) ": " as res `"`cv'"'
+            di as txt "    `c'" _col(20) ": " as res `"`macval(cv)'"'
         }
     }
     di as txt "{hline 72}"
@@ -232,21 +242,22 @@ program define srctag_addmani
     gettoken src 0 : 0
     local mani : char _dta[sources]
     local found 0
-    local rest2 `"`mani'"'
-    while `"`rest2'"' != "" {
-        local p = strpos(`"`rest2'"', "; ")
+    local rest2 `"`macval(mani)'"'
+    while `"`macval(rest2)'"' != "" {
+        local p = strpos(`"`macval(rest2)'"', "; ")
         if `p' {
-            local seg   = substr(`"`rest2'"', 1, `p' - 1)
-            local rest2 = substr(`"`rest2'"', `p' + 2, .)
+            local seg   = substr(`"`macval(rest2)'"', 1, `p' - 1)
+            local rest2 = substr(`"`macval(rest2)'"', `p' + 2, .)
         }
         else {
-            local seg `"`rest2'"'
+            local seg `"`macval(rest2)'"'
             local rest2 ""
         }
-        if `"`seg'"' == `"`src'"' local found 1
+        if `"`macval(seg)'"' == `"`macval(src)'"' local found 1
     }
     if !`found' {
-        char _dta[sources] `"`mani'`=cond(`"`mani'"' == "", "", "; ")'`src'"'
+        local sep = cond(`"`macval(mani)'"' == "", "", "; ")
+        char _dta[sources] `"`macval(mani)'`sep'`macval(src)'"'
     }
 end
 
@@ -322,7 +333,9 @@ program define srctag_apply, rclass
             continue
         }
         char `v'[`c'] `"`macval(x)'"'
-        if "`c'" == "source" & `"`macval(x)'"' != "" srctag_addmani `"`macval(x)'"'
+        if "`c'" == "source" & `"`macval(x)'"' != "" {
+            srctag_addmani `"`macval(x)'"'
+        }
         local ++napplied
     }
     frame drop `fr'

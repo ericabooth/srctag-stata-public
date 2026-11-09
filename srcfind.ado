@@ -1,5 +1,8 @@
-*! version 2.0.0  Eric A. Booth and Elizabeth Teas  08aug2026
+*! version 2.0.1  Eric A. Booth and Elizabeth Teas  09nov2026
 *! srcfind: find variables by their srctag source lineage
+*! v2.0.1 keeps a $ inside tag text: report lines, matching, saving()
+*!        rows, and srcfind values expand tag text through macval(), so a
+*!        saving()/srctag apply round trip no longer rewrites ?$where= URLs.
 *! v2.0.0 adds the warehouse scan (dir()), structured-field search,
 *!        exact/wildcard modes, untagged/not audits, saving() export,
 *!        local() hand-off, and the tags/values subcommands.
@@ -27,13 +30,16 @@ program define srcfind, rclass
         di as err "srcfind: choose either exact or wildcard, not both"
         exit 198
     }
-    if `"`source'"' == "" & `"`pattern'"' != "" local source `"`pattern'"'
-    local source = strtrim(subinstr(`"`source'"', `"""', "", .))
-    if "`untagged'" != "" & (`"`source'"' != "" | "`all'" != "") {
+    * block-form ifs around tag text: a one-line if re-expands its command
+    if `"`macval(source)'"' == "" & `"`macval(pattern)'"' != "" {
+        local source `"`macval(pattern)'"'
+    }
+    local source = strtrim(subinstr(`"`macval(source)'"', `"""', "", .))
+    if "`untagged'" != "" & (`"`macval(source)'"' != "" | "`all'" != "") {
         di as err "srcfind: untagged cannot be combined with a pattern or all"
         exit 198
     }
-    if "`not'" != "" & `"`source'"' == "" {
+    if "`not'" != "" & `"`macval(source)'"' == "" {
         di as err "srcfind: not requires a pattern to invert"
         exit 198
     }
@@ -96,7 +102,7 @@ program define srcfind, rclass
                 continue
             }
             frame `sf' {
-                srcfind_scan, source(`"`source'"') `chopt' `all'          ///
+                srcfind_scan, source(`"`macval(source)'"') `chopt' `all'          ///
                     `untagged' `not' mode(`mode') `casesensitive' `report' ///
                     fileprefix(`"`f'"') `postopt'
             }
@@ -119,7 +125,7 @@ program define srcfind, rclass
     }
 
     * ---- in-memory search -------------------------------------------------
-    srcfind_scan, source(`"`source'"') `chopt' `all' `untagged' `not' ///
+    srcfind_scan, source(`"`macval(source)'"') `chopt' `all' `untagged' `not' ///
         mode(`mode') `casesensitive' `report' `postopt'
     local found "`sfhits'"
 
@@ -193,38 +199,44 @@ program define srcfind_scan
         local firstval ""
         foreach c of local cands {
             local s : char `v'[`c']
-            if `"`s'"' == "" continue
-            if !`tagged' local firstval `"`s'"'
+            if `"`macval(s)'"' == "" continue
+            if !`tagged' {
+                local firstval `"`macval(s)'"'
+            }
             local tagged = 1
             if "`untagged'" != "" continue, break
             if "`all'" != "" {
-                local mval `"`s'"'
+                local mval `"`macval(s)'"'
                 continue, break
             }
-            local lhs `"`s'"'
-            local rhs `"`source'"'
+            local lhs `"`macval(s)'"'
+            local rhs `"`macval(source)'"'
             if "`casesensitive'" == "" {
-                local lhs = lower(`"`lhs'"')
-                local rhs = lower(`"`rhs'"')
+                local lhs = lower(`"`macval(lhs)'"')
+                local rhs = lower(`"`macval(rhs)'"')
             }
             local ok 0
             if "`mode'" == "exact" {
-                if `"`lhs'"' == `"`rhs'"' local ok 1
+                if `"`macval(lhs)'"' == `"`macval(rhs)'"' local ok 1
             }
             else if "`mode'" == "wildcard" {
-                if strmatch(`"`lhs'"', `"`rhs'"') local ok 1
+                if strmatch(`"`macval(lhs)'"', `"`macval(rhs)'"') local ok 1
             }
             else {
-                if strpos(`"`lhs'"', `"`rhs'"') | `"`rhs'"' == "" local ok 1
+                if strpos(`"`macval(lhs)'"', `"`macval(rhs)'"') | `"`macval(rhs)'"' == "" local ok 1
             }
-            if `ok' & `"`mval'"' == "" local mval `"`s'"'
+            if `ok' & `"`macval(mval)'"' == "" {
+                local mval `"`macval(s)'"'
+            }
         }
         * selection rule
         local sel = 0
         if "`untagged'" != "" local sel = !`tagged'
-        else if "`all'" != "" local sel = (`"`mval'"' != "")
+        else if "`all'" != "" {
+            local sel = (`"`macval(mval)'"' != "")
+        }
         else {
-            local sel = (`"`mval'"' != "")
+            local sel = (`"`macval(mval)'"' != "")
             if "`not'" != "" local sel = !`sel'
         }
         if !`sel' continue
@@ -236,32 +248,36 @@ program define srcfind_scan
             }
             local ind = cond(`"`fileprefix'"' == "", "", "  ")
             local vin : char `v'[source_vintage]
-            if `"`vin'"' == "" local vin : char `v'[src_vintage]
+            if `"`macval(vin)'"' == "" local vin : char `v'[src_vintage]
             * a -not- hit is tagged with something ELSE: show that, not a
             * misleading "(no source tag)"
-            local dval `"`mval'"'
-            if `"`dval'"' == "" local dval `"`firstval'"'
-            if `"`dval'"' == "" {
+            local dval `"`macval(mval)'"'
+            if `"`macval(dval)'"' == "" {
+                local dval `"`macval(firstval)'"'
+            }
+            if `"`macval(dval)'"' == "" {
                 di as txt "`ind'" %-16s "`v'" as txt "(no source tag)"
             }
-            else if `"`vin'"' != "" {
-                di as txt "`ind'" %-16s "`v'" as res `"`dval'"' ///
-                    as txt " (" as res `"`vin'"' as txt ")"
+            else if `"`macval(vin)'"' != "" {
+                di as txt "`ind'" %-16s "`v'" as res `"`macval(dval)'"' ///
+                    as txt " (" as res `"`macval(vin)'"' as txt ")"
             }
-            else di as txt "`ind'" %-16s "`v'" as res `"`dval'"'
+            else {
+                di as txt "`ind'" %-16s "`v'" as res `"`macval(dval)'"'
+            }
         }
         if "`post'" != "" {
             local nrows = 0
             foreach c of local cands {
                 local s : char `v'[`c']
-                if `"`s'"' == "" continue
-                post `post' (`"`fileprefix'"') ("`v'") ("`c'") (`"`s'"')
+                if `"`macval(s)'"' == "" continue
+                post `post' (`"`fileprefix'"') ("`v'") ("`c'") (`"`macval(s)'"')
                 local ++nrows
             }
             foreach c in source_vintage source_notes {
                 local s : char `v'[`c']
-                if `"`s'"' != "" & "`char'" == "" {
-                    post `post' (`"`fileprefix'"') ("`v'") ("`c'") (`"`s'"')
+                if `"`macval(s)'"' != "" & "`char'" == "" {
+                    post `post' (`"`fileprefix'"') ("`v'") ("`c'") (`"`macval(s)'"')
                     local ++nrows
                 }
             }
@@ -337,10 +353,10 @@ program define srcfind_values, rclass
     local nvals = 0
     foreach v of local allv {
         local cv : char `v'[`cname']
-        if `"`cv'"' == "" continue
+        if `"`macval(cv)'"' == "" continue
         local hit = 0
         forvalues j = 1/`nvals' {
-            if `"`val`j''"' == `"`cv'"' {
+            if `"`macval(val`j')'"' == `"`macval(cv)'"' {
                 local cnt`j' = `cnt`j'' + 1
                 local hit = 1
                 continue, break
@@ -348,7 +364,7 @@ program define srcfind_values, rclass
         }
         if !`hit' {
             local ++nvals
-            local val`nvals' `"`cv'"'
+            local val`nvals' `"`macval(cv)'"'
             local cnt`nvals' = 1
         }
     }
@@ -362,11 +378,12 @@ program define srcfind_values, rclass
     forvalues j = 1/`nvals' {
         if "`nolinks'" == "" {
             local opt = cond("`cname'" == "source", "", ", char(`cname')")
-            di as txt "  " as res `"{stata `"srcfind `val`j''`opt'"':`val`j''}"' ///
+            local lk = subinstr(`"`macval(val`j')'"', char(36), char(92) + char(36), .)
+            di as txt "  " as res `"{stata `"srcfind `macval(lk)'`opt'"':`macval(val`j')'}"' ///
                 as txt "  (vars=" as res `cnt`j'' as txt ")"
         }
         else {
-            di as txt "  " as res `"`val`j''"' as txt "  (vars=" as res `cnt`j'' as txt ")"
+            di as txt "  " as res `"`macval(val`j')'"' as txt "  (vars=" as res `cnt`j'' as txt ")"
         }
     }
 end

@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.0 08aug2026 Eric A. Booth and Elizabeth Teas}{...}
+{* *! version 2.0.1 09nov2026 Eric A. Booth and Elizabeth Teas}{...}
 {vieweralsosee "srcfind" "help srcfind"}{...}
 {vieweralsosee "[P] char" "help char"}{...}
 {vieweralsosee "[D] notes" "help notes"}{...}
@@ -224,8 +224,8 @@ Stata:{p_end}
 {pstd}
 {cmd:datadictionary}'s {cmd:dofile()} option closes the loop in the
 other direction. It writes a relabel do-file that snapshots the current
-metadata (labels, formats, notes, and {it:all variable characteristics,
-lineage tags included}), so when the data go out as a bare CSV to a
+metadata (labels, formats, notes, and
+{it:all variable characteristics, lineage tags included}), so when the data go out as a bare CSV to a
 collaborator in R, Python, or Excel and come back edited, one {cmd:do}
 restores every tag exactly as stamped:{p_end}
 

@@ -1,4 +1,4 @@
-* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.0
+* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.1
 * Run from the directory holding srctag.ado and srcfind.ado:
 *   do test_srctag.do
 clear all
@@ -292,6 +292,34 @@ preserve
     srcfind TWC
     assert r(n) == 2
     assert "`r(varlist)'" == "q_wage q_hours"
+restore
+
+* --- (20) a $ inside tag text survives show, srcfind, saving(), apply (2.0.1) -
+preserve
+    sysuse auto, clear
+    char price[src_url] "https://data.texas.gov/resource/abcd-1234.json?\$where=year>2020&\$limit=5000"
+    char price[source] "\$USD dealer list"
+    local want : char price[src_url]
+    assert strpos(`"`macval(want)'"', char(36) + "where") > 0
+    srctag show price
+    srcfind USD
+    assert "`r(varlist)'" == "price"
+    tempfile lin19
+    srcfind, all noreport saving("`lin19'.dta", replace)
+    srctag apply using "`lin19'.dta", replace
+    local got : char price[src_url]
+    assert `"`macval(got)'"' == `"`macval(want)'"'
+    local got : char price[source]
+    assert `"`macval(got)'"' == char(36) + "USD dealer list"
+    use "`lin19'.dta", clear
+    quietly count if strpos(value, char(36) + "limit=5000") > 0
+    assert r(N) == 1
+    sysuse auto, clear
+    srctag price, source("\$USD list") url("https://x.org/a?\$top=5")
+    local got : char price[src_url]
+    assert `"`macval(got)'"' == "https://x.org/a?" + char(36) + "top=5"
+    local m : char _dta[sources]
+    assert `"`macval(m)'"' == char(36) + "USD list"
 restore
 
 di as res "ALL TESTS PASSED"
