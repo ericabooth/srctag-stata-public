@@ -200,6 +200,7 @@ needed:{p_end}
 
 {cmd}{...}
         . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
+        . use "panel", clear
         . srcfind 2019               // which mapped variables trace to a 2019 file?
 {txt}{...}
 

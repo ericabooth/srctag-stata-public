@@ -202,6 +202,7 @@ stamp:{p_end}
 
 {cmd}{...}
         . combineall using "panel", cmethod(append) directory("raw") map(renames.csv)
+        . use "panel", clear
         . srcfind , all                        // combineall's stamps, ready to search
         . srctag wage, agency(TWC) url(https://twc.texas.gov)
 {txt}{...}
