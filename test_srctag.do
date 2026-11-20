@@ -1,4 +1,4 @@
-* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.1
+* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.2
 * Run from the directory holding srctag.ado and srcfind.ado:
 *   do test_srctag.do
 clear all
@@ -321,5 +321,87 @@ preserve
     local m : char _dta[sources]
     assert `"`macval(m)'"' == char(36) + "USD list"
 restore
+
+* --- (21) src_vintage follows source_vintage (2.0.2) ---------------------------
+* codebooks built on the structured schema read src_vintage; 2.0.0 and 2.0.1
+* wrote vintage() only to source_vintage
+sysuse auto, clear
+* vintage() writes both names
+srctag price mpg, agency("EPA") vintage("2024")
+foreach v in price mpg {
+    local a : char `v'[source_vintage]
+    local b : char `v'[src_vintage]
+    assert "`a'" == "2024" & "`b'" == "2024"
+}
+* the guard covers source_vintage: a refused change writes neither name
+capture noisily srctag price, vintage("2025")
+assert _rc == 110
+local b : char price[src_vintage]
+assert "`b'" == "2024"
+srctag price, vintage("2025") replace
+local b : char price[src_vintage]
+assert "`b'" == "2025"
+* a src_vintage set by a direct char is brought into line, not refused
+char length[src_vintage] "direct char value"
+srctag length, vintage("2024")
+local b : char length[src_vintage]
+assert "`b'" == "2024"
+* a stale src_vintage beside a matching source_vintage is resynced
+char mpg[src_vintage] "stale"
+srctag mpg, vintage("2024")
+local b : char mpg[src_vintage]
+assert "`b'" == "2024"
+* key(source_vintage) writes both
+srctag turn, key(source_vintage) value(K1)
+local b : char turn[src_vintage]
+assert "`b'" == "K1"
+* a $ in the vintage survives into src_vintage
+srctag weight, vintage("\$where=year>2020")
+local b : char weight[src_vintage]
+assert `"`macval(b)'"' == char(36) + "where=year>2020"
+srctag show weight
+* apply: a corrected source_vintage row sets both names whatever the row
+* order; a src_vintage row that disagrees with its source_vintage row is
+* discarded and reported in r(n_mirror_diff)
+tempfile lin21 e21 s21
+srcfind , all noreport saving("`lin21'.dta", replace)
+preserve
+    use "`lin21'.dta", clear
+    quietly replace value = "NEW"  if varname == "price" & charname == "source_vintage"
+    quietly replace value = "ONLY" if varname == "mpg"   & charname == "src_vintage"
+    quietly save "`e21'.dta", replace
+    gsort charname varname
+    quietly save "`s21'.dta", replace
+restore
+foreach f in e21 s21 {
+    preserve
+        srctag apply using "``f''.dta", replace
+        assert r(n_applied) == 1
+        assert r(n_mirror_diff) == 2
+        local a : char price[source_vintage]
+        local b : char price[src_vintage]
+        assert "`a'" == "NEW" & "`b'" == "NEW"
+        local b : char mpg[src_vintage]
+        assert "`b'" == "2024"
+    restore
+}
+* apply: an unedited export (every src_vintage row matches its
+* source_vintage row) counts as n_mirror, never n_mirror_diff
+tempfile lin21b
+preserve
+    srcfind , all noreport saving("`lin21b'.dta", replace)
+    srctag apply using "`lin21b'.dta", replace
+    assert r(n_applied) == 0
+    assert r(n_mirror_diff) == 0
+    assert r(n_mirror) >= 1
+restore
+
+* key(src_vintage) is a direct write to src_vintage only; it does not
+* backfill source_vintage.  Use vintage() or key(source_vintage) to set both.
+sysuse auto, clear
+srctag price, key(src_vintage) value(K2)
+local a : char price[source_vintage]
+local b : char price[src_vintage]
+assert "`a'" == "" & "`b'" == "K2"
 
 di as res "ALL TESTS PASSED"

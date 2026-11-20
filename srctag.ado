@@ -1,5 +1,14 @@
-*! version 2.0.1  Eric A. Booth and Elizabeth Teas  09nov2026
+*! version 2.0.2  Eric A. Booth and Elizabeth Teas  20nov2026
 *! srctag: stamp variables with their source lineage in characteristics
+*! v2.0.2 every write of source_vintage (vintage(), key(source_vintage),
+*!        apply) also writes src_vintage, the structured schema's name for
+*!        the vintage, which 2.0.0 stopped writing; codebooks read it.
+*!        The apply receipt splits the two src_vintage-row cases: the
+*!        benign duplicate (value matches source_vintage) is skipped
+*!        silently, and a disagreement is discarded with a warning that
+*!        names the rows and says to edit source_vintage instead.
+*!        -key(src_vintage)- sets only src_vintage; source_vintage is not
+*!        backfilled.  Use -vintage()- or -key(source_vintage)- to set both.
 *! v2.0.1 keeps a $ inside tag text (OData/Socrata ?$where= URLs, "$USD"):
 *!        stamping, show, and the sources manifest expand tag text through
 *!        macval(), so nothing is macro-expanded away.
@@ -155,10 +164,17 @@ program define srctag, rclass
     }
 
     * ---- write the tags ---------------------------------------------------
+    * src_vintage, the structured schema's name for the vintage, follows
+    * source_vintage.  The guard above applies to source_vintage only, so a
+    * src_vintage set some other way (a direct -char-, an older srctag) is
+    * brought into line rather than refused.  Block-form if keeps a $.
     local n = 0
     foreach v of varlist `varlist' {
         forvalues j = 1/`npairs' {
             char `v'[`pc`j''] `"`macval(pv`j')'"'
+            if "`pc`j''" == "source_vintage" {
+                char `v'[src_vintage] `"`macval(pv`j')'"'
+            }
         }
         local ++n
     }
@@ -206,8 +222,11 @@ program define srctag_show_one
             di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `macval(lk)'"':`macval(cv)'}"'
         }
     }
+    local svin : char `v'[source_vintage]
     foreach c in src_agency src_dataset src_vintage src_category {
         local cv : char `v'[`c']
+        * src_vintage normally repeats source_vintage, printed just above
+        if "`c'" == "src_vintage" & `"`macval(cv)'"' == `"`macval(svin)'"' continue
         if `"`macval(cv)'"' != "" {
             local lk = subinstr(`"`macval(cv)'"', char(36), char(92) + char(36), .)
             di as txt "  `c'" _col(20) ": " as res `"{stata `"srcfind `macval(lk)', char(`c')"':`macval(cv)'}"'
@@ -291,6 +310,22 @@ program define srctag_apply, rclass
         }
     }
 
+    * src_vintage follows source_vintage.  saving() writes a row for each,
+    * so when a variable has a source_vintage row, that row sets both names
+    * and the variable's src_vintage row is discarded; otherwise an unedited
+    * src_vintage row could undo a corrected source_vintage.  Mark each row
+    * with whether its variable has a source_vintage row, and carry the
+    * source_vintage row's value forward so the receipt can tell a benign
+    * duplicate from a discarded disagreement.
+    tempvar ord isv hassv svval
+    frame `fr' {
+        gen long `ord' = _n
+        gen byte `isv' = (charname == "source_vintage")
+        bysort varname (`isv'): gen byte `hassv' = `isv'[_N]
+        bysort varname (`isv'): gen strL `svval' = value[_N]
+        sort `ord'
+    }
+
     local N = 0
     frame `fr': local N = _N
     local napplied  = 0
@@ -299,16 +334,30 @@ program define srctag_apply, rclass
     local nskipvar  = 0
     local nskipname = 0
     local nblank    = 0
+    local nmirror   = 0
+    local nmirrordiff = 0
     local missvars ""
     forvalues i = 1/`N' {
         frame `fr' {
             local v = varname[`i']
             local c = charname[`i']
             local x = value[`i']
+            local h = `hassv'[`i']
+            local sv = `svval'[`i']
         }
         * rows with no charname are the untagged placeholders saving() writes
         if "`c'" == "" {
             local ++nblank
+            continue
+        }
+        if "`c'" == "src_vintage" & `h' {
+            if `"`macval(x)'"' == `"`macval(sv)'"' {
+                local ++nmirror
+            }
+            else {
+                local ++nmirrordiff
+                local mdiff`nmirrordiff' "`v'[src_vintage]"
+            }
             continue
         }
         capture confirm name `c'
@@ -324,6 +373,9 @@ program define srctag_apply, rclass
         }
         local cur : char `v'[`c']
         if `"`macval(cur)'"' == `"`macval(x)'"' {
+            if "`c'" == "source_vintage" {
+                char `v'[src_vintage] `"`macval(x)'"'
+            }
             local ++nsame
             continue
         }
@@ -333,6 +385,9 @@ program define srctag_apply, rclass
             continue
         }
         char `v'[`c'] `"`macval(x)'"'
+        if "`c'" == "source_vintage" {
+            char `v'[src_vintage] `"`macval(x)'"'
+        }
         if "`c'" == "source" & `"`macval(x)'"' != "" {
             srctag_addmani `"`macval(x)'"'
         }
@@ -358,12 +413,24 @@ program define srctag_apply, rclass
         di as txt "              skipped `nskipname' row(s) with an invalid charname"
     if `nblank' ///
         di as txt "              ignored `nblank' untagged placeholder row(s)"
+    if `nmirror' ///
+        di as txt "              `nmirror' src_vintage row(s) skipped: src_vintage follows the source_vintage row"
+    if `nmirrordiff' {
+        di as err "              `nmirrordiff' src_vintage row(s) DISCARDED: their value disagrees with"
+        di as err "              the source_vintage row and src_vintage follows source_vintage."
+        di as err "              To change the vintage, edit the source_vintage row. Rows:"
+        forvalues j = 1/`nmirrordiff' {
+            di as err "                `mdiff`j''"
+        }
+    }
     local sig : char _dta[src_signature]
     if `"`sig'"' != "" & `napplied' > 0 ///
         di as txt `"              the data are signed; rerun {stata "srctag sign":srctag sign} to restamp the signing time over the edited tags"'
 
-    return scalar n_applied = `napplied'
-    return scalar n_same    = `nsame'
-    return scalar n_held    = `nheld'
-    return scalar n_skipped = `nskipvar' + `nskipname'
+    return scalar n_applied     = `napplied'
+    return scalar n_same        = `nsame'
+    return scalar n_held        = `nheld'
+    return scalar n_skipped     = `nskipvar' + `nskipname'
+    return scalar n_mirror      = `nmirror'
+    return scalar n_mirror_diff = `nmirrordiff'
 end

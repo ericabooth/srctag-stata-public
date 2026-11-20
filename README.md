@@ -126,6 +126,17 @@ exports, sign/verify, and `$` inside tag text.
 
 ## Changes
 
+- **2.0.2 (2026-11-20):** `vintage()` writes `src_vintage` as well as
+  `source_vintage`, as do `key(source_vintage)` and `srctag apply`. 2.0.0 and
+  2.0.1 wrote only `source_vintage`, so codebooks that read the structured
+  schema's `src_vintage` showed a blank vintage. The `replace` guard still
+  applies to `source_vintage` only, and `src_vintage` follows it. In
+  `srctag apply`, a variable's `source_vintage` row sets both names; its
+  `src_vintage` row is discarded, and the receipt reports it two ways -- a
+  silent skip when the row's value matches `source_vintage`, and a warning
+  naming the row when the two disagree, with the count returned in
+  `r(n_mirror)` and `r(n_mirror_diff)`. `key(src_vintage)` sets only
+  `src_vintage`; use `vintage()` or `key(source_vintage)` to set both schemas.
 - **2.0.1 (2026-11-09):** a `$` inside tag text (OData/Socrata
   `?$where=` URLs, `$USD`) is kept everywhere. In 2.0.0, `srctag show`,
   `srcfind` report lines and `saving()` rows, and the `_dta[sources]` manifest

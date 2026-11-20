@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.1 09nov2026 Eric A. Booth and Elizabeth Teas}{...}
+{* *! version 2.0.2 20nov2026 Eric A. Booth and Elizabeth Teas}{...}
 {vieweralsosee "srcfind" "help srcfind"}{...}
 {vieweralsosee "[P] char" "help char"}{...}
 {vieweralsosee "[D] notes" "help notes"}{...}
@@ -67,7 +67,9 @@ Two schemas live side by side. The simple one is {opt source()},
 structured one is {opt agency()}, {opt dataset()}, {opt url()}, and
 {opt category()}, which write {cmd:src_agency}, {cmd:src_dataset},
 {cmd:src_url}, and {cmd:src_category}, plus {opt key()}/{opt value()} for
-any field the schema does not name. Use the simple schema when one line of
+any field the schema does not name. The structured schema's name for the
+vintage is {cmd:src_vintage}; {opt vintage()} writes it too, with the same
+value as {cmd:source_vintage}. Use the simple schema when one line of
 text answers the provenance question; add structured fields when different
 consumers need different pieces (the URL for the analyst, the agency for
 the client memo). {helpb srcfind} searches both without being told
@@ -96,8 +98,13 @@ matches by default, what the manifest accumulates, and what
 
 {phang}
 {opt vintage(text)} records the data vintage (for example {cmd:2026q2} or
-{cmd:FY2025 run 46820}) in {cmd:source_vintage}. {helpb srcfind} prints it
-in parentheses beside each match.{p_end}
+{cmd:FY2025 run 46820}) in {cmd:source_vintage}, and the same value in
+{cmd:src_vintage}, the name codebooks built on the structured schema read.
+{helpb srcfind} prints it in parentheses beside each match. The
+{cmd:replace} guard applies to {cmd:source_vintage}; {cmd:src_vintage}
+always follows it, even over a value set another way (a direct {cmd:char},
+or {cmd:srctag} 2.0.0 and 2.0.1, which wrote only {cmd:source_vintage}).
+{cmd:key(source_vintage)} behaves the same way.{p_end}
 
 {phang}
 {opt notes(text)} records free-text caveats in {cmd:source_notes}.{p_end}
@@ -110,7 +117,10 @@ in parentheses beside each match.{p_end}
 {phang}
 {opt key(name)} and {opt value(text)}, which must be supplied together,
 write any additional characteristic: for example
-{cmd:key(src_confidence) value(high)}.{p_end}
+{cmd:key(src_confidence) value(high)}. {cmd:key(src_vintage)} sets only
+{cmd:src_vintage}; it does not backfill {cmd:source_vintage}. To set both
+schemas' vintage from one call, use {opt vintage()} or
+{cmd:key(source_vintage)}.{p_end}
 
 {phang}
 {cmd:replace} permits an existing tag to be changed. Without it, changing
@@ -138,10 +148,15 @@ the Data Editor or a spreadsheet, apply the corrections. The overwrite
 guard holds: a row that would {it:change} an existing tag is held back
 unless {cmd:replace} is given, and a receipt reports every row's fate --
 applied, already current, held, or skipped (variable not in memory, or an
-invalid characteristic name). An applied {cmd:source} value joins the
+invalid characteristic name). A variable's {cmd:source_vintage} row also
+sets its {cmd:src_vintage}; its own {cmd:src_vintage} row is discarded,
+and the receipt reports it two ways -- a silent skip when the row's
+value already matches the {cmd:source_vintage} row, and a warning naming
+the row when the two disagree. To change the vintage, edit the
+{cmd:source_vintage} row. An applied {cmd:source} value joins the
 {cmd:_dta[sources]} manifest. Stored results:
 {cmd:r(n_applied)}, {cmd:r(n_same)}, {cmd:r(n_held)},
-{cmd:r(n_skipped)}. See the
+{cmd:r(n_skipped)}, {cmd:r(n_mirror)}, {cmd:r(n_mirror_diff)}. See the
 {help srctag##review:human review} section below for the full
 recipe.{p_end}
 
