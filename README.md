@@ -14,10 +14,14 @@ Companion package to *Applied Program Evaluation Using Stata*
 ## Install
 
 ```stata
-net install srctag, from("https://raw.githubusercontent.com/ericabooth/srctag-stata-public/main/") replace
+ssc install srctag
 ```
 
-(SSC submission is in progress; once live, `ssc install srctag`.)
+To install the development version from this repository instead:
+
+```stata
+net install srctag, from("https://raw.githubusercontent.com/ericabooth/srctag-stata-public/main/") replace
+```
 
 Requires Stata 16.0 or newer. One install provides both commands.
 
