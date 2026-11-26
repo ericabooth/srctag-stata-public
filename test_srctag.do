@@ -1,4 +1,4 @@
-* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.2
+* test_srctag.do -- behavioral contract for srctag + srcfind v2.0.3
 * Run from the directory holding srctag.ado and srcfind.ado:
 *   do test_srctag.do
 clear all
@@ -403,5 +403,87 @@ srctag price, key(src_vintage) value(K2)
 local a : char price[source_vintage]
 local b : char price[src_vintage]
 assert "`a'" == "" & "`b'" == "K2"
+
+* --- (22) receipts fit 80 columns; saving() prints no stray note (2.0.3) ----
+* Each log runs at linesize 255 so Stata wraps nothing itself: a receipt
+* line over 80 columns is one srctag printed.  Every receipt branch fires:
+* applied, held, skipped variables (a list that must wrap), mirror rows,
+* discarded mirror rows, and the signed-data hint.
+sysuse auto, clear
+srctag price mpg, agency(TWC) dataset(annual wage extract) vintage(2019-2021)
+srctag weight, source(assigned at intake) notes(stable across years)
+srctag sign
+tempfile lin22b note22 rcpt22
+* a plain name with no extension (a tempfile name can carry one)
+local lin22 `"`c(tmpdir)'/srctag_test22_`=runiformint(1, 1e6)'"'
+capture erase `"`lin22'.dta"'
+local ls0 = c(linesize)
+set linesize 255
+quietly log using `"`note22'"', text replace name(note22)
+* saving() to a file that does not exist yet, with and without .dta
+srcfind , all noreport saving("`lin22'.dta", replace)
+capture erase `"`lin22'.dta"'
+srcfind , all noreport saving("`lin22'", replace)
+confirm file `"`lin22'.dta"'
+* ... and over an existing file, which replace must still overwrite
+srcfind , all noreport saving("`lin22'", replace)
+quietly log close note22
+preserve
+    use `"`lin22'.dta"', clear
+    quietly replace value = "2019q1-2021q4" if varname == "price" & ///
+        inlist(charname, "source_vintage", "src_vintage")
+    quietly replace value = "MISMATCH" if varname == "mpg" & ///
+        charname == "src_vintage"
+    quietly replace value = "edited notes" if varname == "weight" & ///
+        charname == "source_notes"
+    quietly count
+    local n0 = r(N)
+    quietly set obs `= `n0' + 6'
+    forvalues k = 1/6 {
+        quietly replace varname  = "gone_var_number_`k'" in `= `n0' + `k''
+        quietly replace charname = "source" in `= `n0' + `k''
+        quietly replace value    = "phantom" in `= `n0' + `k''
+    }
+    quietly save "`lin22b'.dta", replace
+restore
+quietly log using `"`rcpt22'"', text replace name(rcpt22)
+srctag apply using "`lin22b'.dta"
+assert r(n_held) == 2 & r(n_mirror_diff) == 1 & r(n_skipped) == 6
+quietly log close rcpt22
+quietly log using `"`rcpt22'"', text append name(rcpt22)
+srctag apply using "`lin22b'.dta", replace
+assert r(n_applied) == 2 & r(n_mirror) == 1
+quietly log close rcpt22
+set linesize `ls0'
+capture erase `"`lin22'.dta"'
+tempname fh
+* the srcfind log: no "(file ... not found)" note
+local stray 0
+file open `fh' using `"`note22'"', read text
+file read `fh' line
+while r(eof) == 0 {
+    if strpos(`"`macval(line)'"', "not found") local stray 1
+    file read `fh' line
+}
+file close `fh'
+assert `stray' == 0
+* the apply log: receipt lines (not the echoed commands) fit 80 columns,
+* and the wrapped skipped list still names all six variables both times
+local maxlen 0
+local ngone 0
+file open `fh' using `"`rcpt22'"', read text
+file read `fh' line
+while r(eof) == 0 {
+    if substr(`"`macval(line)'"', 1, 2) != ". " {
+        local maxlen = max(`maxlen', strlen(`"`macval(line)'"'))
+        local ngone = `ngone' + (strlen(`"`macval(line)'"') - ///
+            strlen(subinstr(`"`macval(line)'"', "gone_var_number_", "", .))) / 16
+    }
+    file read `fh' line
+}
+file close `fh'
+di as txt "longest receipt line: `maxlen'"
+assert `maxlen' <= 80 & `maxlen' > 60
+assert `ngone' == 12
 
 di as res "ALL TESTS PASSED"

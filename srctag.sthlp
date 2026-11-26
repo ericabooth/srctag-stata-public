@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.0.2 20nov2026 Eric A. Booth and Elizabeth Teas}{...}
+{* *! version 2.0.3 26nov2026 Eric A. Booth and Elizabeth Teas}{...}
 {vieweralsosee "srcfind" "help srcfind"}{...}
 {vieweralsosee "[P] char" "help char"}{...}
 {vieweralsosee "[D] notes" "help notes"}{...}

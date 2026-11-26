@@ -1,5 +1,7 @@
-*! version 2.0.1  Eric A. Booth and Elizabeth Teas  09nov2026
+*! version 2.0.3  Eric A. Booth and Elizabeth Teas  26nov2026
 *! srcfind: find variables by their srctag source lineage
+*! v2.0.3 saving(file, replace) no longer prints a "(file ... not found)"
+*!        note when the file (or the scratch postfile) does not exist yet.
 *! v2.0.1 keeps a $ inside tag text: report lines, matching, saving()
 *!        rows, and srcfind values expand tag text through macval(), so a
 *!        saving()/srctag apply round trip no longer rewrites ?$where= URLs.
@@ -65,8 +67,10 @@ program define srcfind, rclass
         local saverep  = cond(strpos(lower(`"`saverest'"'), "replace"), "replace", "")
         tempname sfpost
         tempfile sfres
+        * no replace: the tempfile does not exist yet, and replace on a
+        * missing file prints a stray "(file ... not found)" note
         postfile `sfpost' str244 file str32 varname str32 charname ///
-            str2000 value using `"`sfres'"', replace
+            str2000 value using `"`sfres'"'
         local postopt "post(`sfpost')"
     }
 
@@ -157,6 +161,13 @@ program define srcfind_savefinish
     quietly use `"`res'"', clear
     quietly compress
     local nr = _N
+    * replace on a file that does not exist yet prints a stray
+    * "(file ... not found)" note, so drop it then.  save adds .dta to a
+    * name with no extension, so check the name save will write.
+    local chk `"`target'"'
+    if !regexm(`"`chk'"', "\.[^./\\]*$") local chk `"`chk'.dta"'
+    capture confirm file `"`chk'"'
+    if _rc local rep ""
     capture noisily save `"`target'"', `rep'
     if _rc {
         restore

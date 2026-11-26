@@ -124,12 +124,18 @@ A test battery ships as an ancillary file (`net get srctag`):
 stata-mp -b do test_srctag.do
 ```
 
-20 numbered blocks cover the tagging contract, guard semantics, the manifest,
+22 numbered blocks cover the tagging contract, guard semantics, the manifest,
 save/use persistence, every search mode, the warehouse scan, audits,
-exports, sign/verify, and `$` inside tag text.
+exports, sign/verify, `$` inside tag text, and the 80-column apply receipt.
 
 ## Changes
 
+- **2.0.3 (2026-11-26):** the `srctag apply` receipt fits in 80 columns; its
+  two longest lines (the src_vintage skip line and the signed-data hint) now
+  continue on a second line, and a long list of skipped variables wraps.
+  `srcfind, saving(file, replace)` no longer prints a stray
+  "(file ... not found)" note when the file does not exist yet. srcfind
+  moves from 2.0.1 to 2.0.3 so both commands share the package version.
 - **2.0.2 (2026-11-20):** `vintage()` writes `src_vintage` as well as
   `source_vintage`, as do `key(source_vintage)` and `srctag apply`. 2.0.0 and
   2.0.1 wrote only `source_vintage`, so codebooks that read the structured

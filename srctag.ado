@@ -1,5 +1,7 @@
-*! version 2.0.2  Eric A. Booth and Elizabeth Teas  20nov2026
+*! version 2.0.3  Eric A. Booth and Elizabeth Teas  26nov2026
 *! srctag: stamp variables with their source lineage in characteristics
+*! v2.0.3 the apply receipt fits in 80 columns: long lines continue on the
+*!        next line, and the list of skipped variables wraps.
 *! v2.0.2 every write of source_vintage (vintage(), key(source_vintage),
 *!        apply) also writes src_vintage, the structured schema's name for
 *!        the vintage, which 2.0.0 stopped writing; codebooks read it.
@@ -405,16 +407,28 @@ program define srctag_apply, rclass
             di as err "                `held`j''"
         }
     }
+    * every receipt line fits in 80 columns; long ones continue on the
+    * next line at the same indent
     if `nskipvar' {
         local missvars : list retokenize missvars
-        di as txt `"              skipped (variable not in memory):`missvars'"'
+        local line "              skipped (variable not in memory):"
+        foreach mv of local missvars {
+            if strlen(`"`line' `mv'"') > 80 {
+                di as txt `"`line'"'
+                local line "               "
+            }
+            local line `"`line' `mv'"'
+        }
+        di as txt `"`line'"'
     }
     if `nskipname' ///
         di as txt "              skipped `nskipname' row(s) with an invalid charname"
     if `nblank' ///
         di as txt "              ignored `nblank' untagged placeholder row(s)"
-    if `nmirror' ///
-        di as txt "              `nmirror' src_vintage row(s) skipped: src_vintage follows the source_vintage row"
+    if `nmirror' {
+        di as txt "              `nmirror' src_vintage row(s) skipped: src_vintage follows"
+        di as txt "              the source_vintage row"
+    }
     if `nmirrordiff' {
         di as err "              `nmirrordiff' src_vintage row(s) DISCARDED: their value disagrees with"
         di as err "              the source_vintage row and src_vintage follows source_vintage."
@@ -424,8 +438,10 @@ program define srctag_apply, rclass
         }
     }
     local sig : char _dta[src_signature]
-    if `"`sig'"' != "" & `napplied' > 0 ///
-        di as txt `"              the data are signed; rerun {stata "srctag sign":srctag sign} to restamp the signing time over the edited tags"'
+    if `"`sig'"' != "" & `napplied' > 0 {
+        di as txt `"              the data are signed; rerun {stata "srctag sign":srctag sign} to restamp"'
+        di as txt "              the signing time over the edited tags"
+    }
 
     return scalar n_applied     = `napplied'
     return scalar n_same        = `nsame'
